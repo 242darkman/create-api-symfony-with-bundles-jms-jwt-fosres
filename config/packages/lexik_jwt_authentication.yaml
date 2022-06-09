@@ -1,0 +1,10 @@
+lexik_jwt_authentication:
+    secret_key: '%env(resolve:JWT_SECRET_KEY)%' # requis pour la création de token
+    public_key: '%env(resolve:JWT_PUBLIC_KEY)%' # requis pour la vérification de token
+    pass_phrase: '%env(JWT_PASSPHRASE)%' # requis pour la création de token
+    token_ttl: 3600 # time to live
+
+    token_extractors:
+        authorization_header: ~
+        cookie: ~
+        query_parameter: ~

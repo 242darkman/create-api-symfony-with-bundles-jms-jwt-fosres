@@ -1,0 +1,19 @@
+# Read the documentation: https://symfony.com/doc/master/bundles/FOSRestBundle/index.html
+
+fos_rest:
+  routing_loader: false
+  body_converter:
+    enabled: true # activation de la désérialisation
+    validate: true
+    validation_errors_argument: validationErrors
+  view:
+    formats: { json: true, xml: false, rss: false } # format pouvant etre gérer pour la sérialisation
+    view_response_listener: true
+  serializer:
+    serialize_null: true # pour éviter que les objets non vide envoyé ne soient ignoré lors de la sérialisation
+  format_listener:
+    rules:
+      - { path: '^/', priorities: ['json'], fallback_format: 'json' }
+  param_fetcher_listener: true
+  exception:
+    enabled: true
