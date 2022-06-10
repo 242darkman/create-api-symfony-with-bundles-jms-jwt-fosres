@@ -10,7 +10,7 @@ if (in_array(PHP_SAPI, ['cli', 'phpdbg'], true)) {
 }
 
 require dirname(__DIR__, 3).''.\DIRECTORY_SEPARATOR.'vendor/autoload.php';
-require __DIR__.'/ContainerU50nYS4/srcApp_KernelDevDebugContainer.php';
+require __DIR__.'/ContainerW5bxOD1/srcApp_KernelDevDebugContainer.php';
 
 $classes = [];
 $classes[] = 'Symfony\Bundle\FrameworkBundle\FrameworkBundle';
@@ -252,11 +252,9 @@ $classes[] = 'JMS\Serializer\Metadata\Driver\AttributeDriver\AttributeReader';
 $classes[] = 'JMS\SerializerBundle\Serializer\StopwatchEventSubscriber';
 $classes[] = 'JMS\SerializerBundle\Debug\RunsListener';
 $classes[] = 'JMS\Serializer\Type\Parser';
-$classes[] = 'App\Events\JWTCreatedListener';
 $classes[] = 'App\Kernel';
 $classes[] = 'Lexik\Bundle\JWTAuthenticationBundle\Command\CheckConfigCommand';
-$classes[] = 'Lexik\Bundle\JWTAuthenticationBundle\Encoder\LcobucciJWTEncoder';
-$classes[] = 'Lexik\Bundle\JWTAuthenticationBundle\Services\JWSProvider\LcobucciJWSProvider';
+$classes[] = 'App\Encoder\APIJWTEncoder';
 $classes[] = 'Lexik\Bundle\JWTAuthenticationBundle\Command\GenerateKeyPairCommand';
 $classes[] = 'Lexik\Bundle\JWTAuthenticationBundle\Command\GenerateTokenCommand';
 $classes[] = 'Lexik\Bundle\JWTAuthenticationBundle\Services\JWTManager';

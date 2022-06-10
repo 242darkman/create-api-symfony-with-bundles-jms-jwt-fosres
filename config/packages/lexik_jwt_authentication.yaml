@@ -8,3 +8,6 @@ lexik_jwt_authentication:
         authorization_header: ~
         cookie: ~
         query_parameter: ~
+
+    encoder:
+        service: acme_api.encoder.nixilla_jwt_encoder

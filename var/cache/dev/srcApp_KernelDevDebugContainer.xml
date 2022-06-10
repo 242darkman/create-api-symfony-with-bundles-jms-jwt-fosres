@@ -269,9 +269,6 @@
       <argument type="service" id="security.user_password_encoder.generic"/>
     </service>
     <service id="App\Encoder\APIJWTEncoder" class="App\Encoder\APIJWTEncoder" autowire="true" autoconfigure="true"/>
-    <service id="App\Events\JWTCreatedListener" class="App\Events\JWTCreatedListener" autowire="true" autoconfigure="true">
-      <argument type="service" id="request_stack"/>
-    </service>
     <service id="App\Repository\MachineOutilRepository" class="App\Repository\MachineOutilRepository" autowire="true" autoconfigure="true">
       <tag name="doctrine.repository_service"/>
       <argument type="service" id="doctrine"/>
@@ -298,10 +295,7 @@
     <service id="App\Security\Provider\UserProvider" class="App\Security\Provider\UserProvider" autowire="true" autoconfigure="true">
       <argument type="service" id="App\Repository\UserRepository"/>
     </service>
-    <service id="jwt_event_listener" class="App\Events\JWTCreatedListener" autowire="true" autoconfigure="true">
-      <tag name="kernel.event_listener" event="lexik_jwt_authentication.on_jwt_created" method="onJWTCreated"/>
-      <argument type="service" id="request_stack"/>
-    </service>
+    <service id="acme_api.encoder.nixilla_jwt_encoder" class="App\Encoder\APIJWTEncoder" autowire="true" autoconfigure="true"/>
     <service id=".legacy_controller_name_converter" class="Symfony\Bundle\FrameworkBundle\Controller\ControllerNameParser" public="false">
       <tag name="monolog.logger" channel="request"/>
       <argument type="service" id="kernel"/>
@@ -1171,14 +1165,6 @@
       <argument type="service" id="debug.stopwatch"/>
       <argument type="service" id="monolog.logger.event" on-invalid="null"/>
       <argument type="service" id="request_stack" on-invalid="null"/>
-      <call method="addListener">
-        <argument>lexik_jwt_authentication.on_jwt_created</argument>
-        <argument type="collection">
-          <argument type="service_closure" id="jwt_event_listener"/>
-          <argument>onJWTCreated</argument>
-        </argument>
-        <argument>0</argument>
-      </call>
       <call method="addListener">
         <argument>kernel.request</argument>
         <argument type="collection">
@@ -2580,6 +2566,7 @@
         <argument type="service" id="security.authentication.provider.dao.login"/>
         <argument type="service" id="security.authentication.provider.anonymous.login"/>
         <argument type="service" id="security.authentication.provider.guard.api"/>
+        <argument type="service" id="security.authentication.provider.anonymous.api"/>
       </argument>
       <argument>true</argument>
       <call method="setEventDispatcher">
@@ -2732,6 +2719,13 @@
       <argument type="service" id="monolog.logger.security" on-invalid="null"/>
     </service>
     <service id="security.access_map" class="Symfony\Component\Security\Http\AccessMap" public="false">
+      <call method="add">
+        <argument type="service" id=".security.request_matcher.RHM.hIp"/>
+        <argument type="collection">
+          <argument>IS_AUTHENTICATED_ANONYMOUSLY</argument>
+        </argument>
+        <argument>null</argument>
+      </call>
       <call method="add">
         <argument type="service" id=".security.request_matcher.Ud1TEPV"/>
         <argument type="collection">
@@ -3117,7 +3111,7 @@
       <argument type="service" id="security.authentication.success_handler.login.json_login"/>
       <argument type="service" id="security.authentication.failure_handler.login.json_login"/>
       <argument type="collection">
-        <argument key="check_path">/api/login_check</argument>
+        <argument key="check_path">/api/login</argument>
         <argument key="use_forward">false</argument>
         <argument key="require_previous_session">false</argument>
         <argument key="username_path">username</argument>
@@ -3174,6 +3168,7 @@
       <argument>null</argument>
       <argument type="collection">
         <argument>guard</argument>
+        <argument>anonymous</argument>
       </argument>
       <argument>null</argument>
     </service>
@@ -3200,6 +3195,15 @@
       <argument type="service" id="monolog.logger.security" on-invalid="null"/>
       <argument>true</argument>
     </service>
+    <service id="security.authentication.listener.anonymous.api" class="Symfony\Component\Security\Http\Firewall\AnonymousAuthenticationListener" public="false">
+      <argument type="service" id="security.untracked_token_storage"/>
+      <argument>%container.build_hash%</argument>
+      <argument type="service" id="monolog.logger.security" on-invalid="null"/>
+      <argument type="service" id="security.authentication.manager"/>
+    </service>
+    <service id="security.authentication.provider.anonymous.api" class="Symfony\Component\Security\Core\Authentication\Provider\AnonymousAuthenticationProvider" public="false">
+      <argument>%container.build_hash%</argument>
+    </service>
     <service id="security.exception_listener.api" class="Symfony\Component\Security\Http\Firewall\ExceptionListener" public="false">
       <argument type="service" id="security.token_storage"/>
       <argument type="service" id="security.authentication.trust_resolver"/>
@@ -3215,6 +3219,7 @@
       <argument type="iterator">
         <argument type="service" id="security.channel_listener"/>
         <argument type="service" id="security.authentication.listener.guard.api"/>
+        <argument type="service" id="security.authentication.listener.anonymous.api"/>
         <argument type="service" id="security.access_listener"/>
       </argument>
       <argument type="service" id="security.exception_listener.api"/>
@@ -3228,6 +3233,9 @@
         <argument key="security.firewall.map.context.dev" type="service_closure" id="security.firewall.map.context.dev"/>
         <argument key="security.firewall.map.context.login" type="service_closure" id="security.firewall.map.context.login"/>
       </argument>
+    </service>
+    <service id=".security.request_matcher.RHM.hIp" class="Symfony\Component\HttpFoundation\RequestMatcher" public="false">
+      <argument>^/api/register</argument>
     </service>
     <service id=".security.request_matcher.Ud1TEPV" class="Symfony\Component\HttpFoundation\RequestMatcher" public="false">
       <argument>^/api/login</argument>
@@ -3283,7 +3291,7 @@
       <deprecated>The "%service_id%" is deprecated since version 2.5 and will be removed in 5.0, use "lexik_jwt_authentication.jws_provider.lcobucci" instead.</deprecated>
     </service>
     <service id="lexik_jwt_authentication.jwt_manager" class="Lexik\Bundle\JWTAuthenticationBundle\Services\JWTManager" public="true">
-      <argument type="service" id="lexik_jwt_authentication.encoder.lcobucci"/>
+      <argument type="service" id="acme_api.encoder.nixilla_jwt_encoder"/>
       <argument type="service" id="debug.event_dispatcher"/>
       <argument>username</argument>
       <call method="setUserIdentityField">
@@ -4879,18 +4887,26 @@
         <argument key="machineRep" type="service_closure" id="App\Repository\MachineOutilRepository"/>
       </argument>
     </service>
+    <service id=".service_locator.32bOmgY" class="Symfony\Component\DependencyInjection\ServiceLocator" public="false">
+      <tag name="container.service_locator"/>
+      <argument type="collection">
+        <argument key="machineRep" type="service_closure" id="App\Repository\MachineOutilRepository"/>
+        <argument key="userRepository" type="service_closure" id="App\Repository\UserRepository"/>
+      </argument>
+    </service>
     <service id=".service_locator.sAt04FW" class="Symfony\Component\DependencyInjection\ServiceLocator" public="false">
       <tag name="container.service_locator"/>
       <argument type="collection">
         <argument key="machineOutil" type="service_closure" id=".errored..service_locator.sAt04FW.App\Entity\MachineOutil"/>
       </argument>
     </service>
-    <service id=".service_locator.mjvCIf6" class="Symfony\Component\DependencyInjection\ServiceLocator" public="false">
+    <service id=".service_locator.zsTyh94" class="Symfony\Component\DependencyInjection\ServiceLocator" public="false">
       <tag name="container.service_locator"/>
       <argument type="collection">
         <argument key="entityManager" type="service_closure" id="doctrine.orm.default_entity_manager"/>
-        <argument key="machineOutil" type="service_closure" id=".errored..service_locator.mjvCIf6.App\Entity\MachineOutil"/>
+        <argument key="machineOutil" type="service_closure" id=".errored..service_locator.zsTyh94.App\Entity\MachineOutil"/>
         <argument key="urlGenerator" type="service_closure" id="router.default"/>
+        <argument key="userRepository" type="service_closure" id="App\Repository\UserRepository"/>
         <argument key="validator" type="service_closure" id="validator"/>
       </argument>
     </service>
@@ -4915,22 +4931,24 @@
         <argument key="viewhandler" type="service_closure" id="fos_rest.view_handler.default"/>
       </argument>
     </service>
-    <service id=".service_locator.IFbZK0U" class="Symfony\Component\DependencyInjection\ServiceLocator" public="false">
+    <service id=".service_locator.UgfeM.F" class="Symfony\Component\DependencyInjection\ServiceLocator" public="false">
       <tag name="container.service_locator"/>
       <argument type="collection">
         <argument key="App\Controller\AuthController::login" type="service_closure" id=".service_locator._IY3B0Q"/>
         <argument key="App\Controller\AuthController::register" type="service_closure" id=".service_locator.bU89EYM"/>
-        <argument key="App\Controller\MachineOutilController::createMachine" type="service_closure" id=".service_locator.mjvCIf6"/>
+        <argument key="App\Controller\MachineOutilController::createMachine" type="service_closure" id=".service_locator.zsTyh94"/>
         <argument key="App\Controller\MachineOutilController::deleteMachine" type="service_closure" id=".service_locator.VQHYetm"/>
         <argument key="App\Controller\MachineOutilController::getAllMachines" type="service_closure" id=".service_locator.ikf2I6m"/>
+        <argument key="App\Controller\MachineOutilController::getAllUserMachines" type="service_closure" id=".service_locator.32bOmgY"/>
         <argument key="App\Controller\MachineOutilController::getMachineItem" type="service_closure" id=".service_locator.sAt04FW"/>
         <argument key="App\Controller\MachineOutilController::setViewHandler" type="service_closure" id=".service_locator._QjC7JD"/>
         <argument key="App\Controller\MachineOutilController::updateMachine" type="service_closure" id=".service_locator.ykTKYuK"/>
         <argument key="App\Controller\AuthController:login" type="service_closure" id=".service_locator._IY3B0Q"/>
         <argument key="App\Controller\AuthController:register" type="service_closure" id=".service_locator.bU89EYM"/>
-        <argument key="App\Controller\MachineOutilController:createMachine" type="service_closure" id=".service_locator.mjvCIf6"/>
+        <argument key="App\Controller\MachineOutilController:createMachine" type="service_closure" id=".service_locator.zsTyh94"/>
         <argument key="App\Controller\MachineOutilController:deleteMachine" type="service_closure" id=".service_locator.VQHYetm"/>
         <argument key="App\Controller\MachineOutilController:getAllMachines" type="service_closure" id=".service_locator.ikf2I6m"/>
+        <argument key="App\Controller\MachineOutilController:getAllUserMachines" type="service_closure" id=".service_locator.32bOmgY"/>
         <argument key="App\Controller\MachineOutilController:getMachineItem" type="service_closure" id=".service_locator.sAt04FW"/>
         <argument key="App\Controller\MachineOutilController:setViewHandler" type="service_closure" id=".service_locator._QjC7JD"/>
         <argument key="App\Controller\MachineOutilController:updateMachine" type="service_closure" id=".service_locator.ykTKYuK"/>
@@ -5251,12 +5269,12 @@
       <argument type="service" id="security.token_storage"/>
     </service>
     <service id="debug.argument_resolver.service.inner" class="Symfony\Component\HttpKernel\Controller\ArgumentResolver\ServiceValueResolver" public="false">
-      <argument type="service" id=".service_locator.IFbZK0U"/>
+      <argument type="service" id=".service_locator.UgfeM.F"/>
     </service>
     <service id="debug.argument_resolver.default.inner" class="Symfony\Component\HttpKernel\Controller\ArgumentResolver\DefaultValueResolver" public="false"/>
     <service id="debug.argument_resolver.variadic.inner" class="Symfony\Component\HttpKernel\Controller\ArgumentResolver\VariadicValueResolver" public="false"/>
     <service id="debug.argument_resolver.not_tagged_controller.inner" class="Symfony\Component\HttpKernel\Controller\ArgumentResolver\NotTaggedControllerValueResolver" public="false">
-      <argument type="service" id=".service_locator.IFbZK0U"/>
+      <argument type="service" id=".service_locator.UgfeM.F"/>
     </service>
     <service id="fos_rest.serializer.form_error_handler.inner" class="JMS\Serializer\Handler\FormErrorHandler" public="false">
       <argument>null</argument>
@@ -5266,7 +5284,7 @@
       <argument type="service" id="jms_serializer.handler_registry.service_locator"/>
     </service>
     <service id=".errored..service_locator.sAt04FW.App\Entity\MachineOutil" class="App\Entity\MachineOutil"/>
-    <service id=".errored..service_locator.mjvCIf6.App\Entity\MachineOutil" class="App\Entity\MachineOutil"/>
+    <service id=".errored..service_locator.zsTyh94.App\Entity\MachineOutil" class="App\Entity\MachineOutil"/>
     <service id=".errored..service_locator.ykTKYuK.App\Entity\MachineOutil" class="App\Entity\MachineOutil"/>
     <service id=".errored..service_locator.VQHYetm.App\Entity\MachineOutil" class="App\Entity\MachineOutil"/>
     <service id="console.command_loader" class="Symfony\Component\Console\CommandLoader\ContainerCommandLoader" public="true">
@@ -5563,8 +5581,8 @@
     <service id="Lexik\Bundle\JWTAuthenticationBundle\Security\Http\Authentication\AuthenticationFailureHandler" alias="lexik_jwt_authentication.handler.authentication_failure"/>
     <service id="Lexik\Bundle\JWTAuthenticationBundle\TokenExtractor\TokenExtractorInterface" alias="lexik_jwt_authentication.extractor.chain_extractor"/>
     <service id="lexik_jwt_authentication.jwt_token_authenticator" alias="lexik_jwt_authentication.security.guard.jwt_token_authenticator"/>
-    <service id="lexik_jwt_authentication.encoder" alias="lexik_jwt_authentication.encoder.lcobucci" public="true"/>
-    <service id="Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface" alias="lexik_jwt_authentication.encoder.lcobucci"/>
+    <service id="lexik_jwt_authentication.encoder" alias="acme_api.encoder.nixilla_jwt_encoder" public="true"/>
+    <service id="Lexik\Bundle\JWTAuthenticationBundle\Encoder\JWTEncoderInterface" alias="acme_api.encoder.nixilla_jwt_encoder"/>
     <service id="lexik_jwt_authentication.key_loader" alias="lexik_jwt_authentication.key_loader.raw" public="true"/>
     <service id="FOS\RestBundle\View\ViewHandlerInterface" alias="fos_rest.view_handler.default"/>
     <service id="FOS\RestBundle\Request\ParamFetcherInterface" alias="fos_rest.request.param_fetcher"/>
@@ -5589,7 +5607,7 @@
     <service id="logger" alias="monolog.logger"/>
     <service id="Psr\Log\LoggerInterface" alias="monolog.logger" public="false"/>
     <service id="container.env_var_processors_locator" alias=".service_locator.CmORmuK" public="true"/>
-    <service id="argument_resolver.controller_locator" alias=".service_locator.IFbZK0U"/>
+    <service id="argument_resolver.controller_locator" alias=".service_locator.UgfeM.F"/>
     <service id="fos_rest.serializer" alias="fos_rest.serializer.jms"/>
     <service id="jms_serializer.authorization_checker" alias="security.authorization_checker" public="true"/>
     <service id="Psr\Log\LoggerInterface $requestLogger" alias="monolog.logger.request"/>

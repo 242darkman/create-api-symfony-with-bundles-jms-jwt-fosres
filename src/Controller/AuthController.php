@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Encoder\APIJWTEncoder;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use Lexik\Bundle\JWTAuthenticationBundle\Exception\JWTEncodeFailureException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,6 +18,9 @@ use Symfony\Component\Security\Core\User\UserInterface;
 class AuthController extends AbstractController
 {
 
+    /**
+     * @var SerializerInterface
+     */
     public SerializerInterface $serializer;
 
     /**
@@ -28,7 +32,7 @@ class AuthController extends AbstractController
     }
 
     /**
-     * méthode créant le compte d'un utilisateur
+     * méthode créant le compte d'un utilisateur dans notre API
      *
      * @param Request $request
      * @param UserPasswordEncoderInterface $encoder
@@ -36,12 +40,11 @@ class AuthController extends AbstractController
      */
     public function register(Request $request, UserPasswordEncoderInterface $encoder): JsonResponse
     {
-        dd($request);
         $em = $this->getDoctrine()->getManager();
-        $request = $this->decode($request);
-        $name = $request->get('name');
-        $mail = $request->get('email');
-        $password = $request->get('password');
+        $request_content = json_decode($request->getContent(), true);
+        $name = $request_content['name'];
+        $mail = $request_content['email'];
+        $password = $request_content['password'];
 
         if(empty($name) || empty($mail) || empty($password)){
             $error_message = [
@@ -65,23 +68,20 @@ class AuthController extends AbstractController
     }
 
     /**
+     * méthode permettant l'authentification d'un utilisateur sur notre API
      *
      * @param Request $request
      * @param UserRepository $repository
      * @param UserPasswordEncoderInterface $encoder
      * @return JsonResponse
-     * @throws \Lexik\Bundle\JWTAuthenticationBundle\Exception\JWTEncodeFailureException
+     * @throws JWTEncodeFailureException
      */
     public function login(Request $request, UserRepository $repository, UserPasswordEncoderInterface $encoder): JsonResponse
     {
-        //dd(json_decode($request->getContent(), true)); OK
-        $content = json_decode($request->getContent(), true);
-        //dd($content['mail']); OK
-        $user = $repository->findOneBy(['mail'=>$content['mail'],]);
-        //dd($user); OK
-        //dd($encoder->isPasswordValid($user, $content['password'])); OK
+        $request_content = json_decode($request->getContent(), true);
+        $user = $repository->findOneBy(['mail'=>$request_content['email'],]);
 
-        if(!$user || !$encoder->isPasswordValid($user, $content['password']))
+        if(!$user || !$encoder->isPasswordValid($user, $request_content['password']))
         {
             $failure_message = [
                 "code" => 422,
@@ -95,9 +95,9 @@ class AuthController extends AbstractController
             'exp' => time() + 3600, // 1 hour expiration
         ];
 
-        //$token = $this->get('lexik_jwt_authentication.encoder')->encode($payload);
         $api_encoder = new APIJWTEncoder();
-        $token = $api_encoder->encode($payload);
+        $token = $api_encoder->encode($payload); // génération de token
+
         $success_msg = [
             "code" => 200,
             "message"  => sprintf('User %s logged with success', $user->getUsername()),
@@ -106,16 +106,6 @@ class AuthController extends AbstractController
 
         return new JsonResponse($success_msg, Response::HTTP_OK);
     }
-
-    /**
-     * @param UserInterface $user
-     * @param JWTTokenManagerInterface $tokenManager
-     * @return JsonResponse
-     */
- /*   public function getTokenUser(UserInterface $user, JWTTokenManagerInterface $tokenManager): JsonResponse
-    {
-        return new JsonResponse(['token' => $tokenManager->create($user)]);
-    }*/
 
 
 }

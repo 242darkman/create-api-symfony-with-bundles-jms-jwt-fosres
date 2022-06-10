@@ -13,7 +13,7 @@ api_login_check:
   controller: App\Controller\AuthController::login
   methods: POST
 
-#register:
-#  path: /api/register
-#  controller: App\Controller\AppController::register
-#  methods: POST
+register:
+  path: /api/register
+  controller: App\Controller\AuthController::register
+  methods: POST

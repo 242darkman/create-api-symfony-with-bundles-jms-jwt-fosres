@@ -38,10 +38,13 @@ services:
         tags:
             - { name: 'request.param_converter', converter: 'post_converter', priority: 255 }
 
-    jwt_event_listener:
-        class: App\Events\JWTCreatedListener
-        arguments: [ '@request_stack' ]
-        tags:
-            - { name: kernel.event_listener, event: lexik_jwt_authentication.on_jwt_created, method: onJWTCreated }
+#    jwt_event_listener:
+#        class: App\Events\JWTCreatedListener
+#        arguments: [ '@request_stack' ]
+#        tags:
+#            - { name: kernel.event_listener, event: lexik_jwt_authentication.on_jwt_created, method: onJWTCreated }
+
+    acme_api.encoder.nixilla_jwt_encoder:
+        class: App\Encoder\APIJWTEncoder
 
     Symfony\Bridge\Doctrine\Security\User\UserLoaderInterface: '@App\Repository\UserRepository'

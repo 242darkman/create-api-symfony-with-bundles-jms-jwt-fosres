@@ -52,6 +52,7 @@ class User implements UserInterface
      */
     private $id_machine;
 
+
     public function __construct()
     {
         $this->id_machine = new ArrayCollection();
@@ -61,6 +62,7 @@ class User implements UserInterface
     {
         return $this->id;
     }
+
 
     public function getPassword()
     {
@@ -98,6 +100,8 @@ class User implements UserInterface
 
         return $this;
     }
+
+
 
     /**
      * @param $mail
@@ -150,6 +154,7 @@ class User implements UserInterface
 
     public function getSalt()
     {
+        return $this->id;
     }
 
     public function getUsername(): string

@@ -47,6 +47,11 @@ class MachineOutilRepository extends ServiceEntityRepository
         }
     }
 
+
+    public function getUserMachines($id_user){
+
+    }
+
     // /**
     //  * @return MachineOutil[] Returns an array of MachineOutil objects
     //  */

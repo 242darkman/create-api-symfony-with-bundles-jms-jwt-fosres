@@ -7,13 +7,15 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Repository\MachineOutilRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\NonUniqueResultException;
+use JMS\Serializer\SerializerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use FOS\RestBundle\Controller\Annotations as Rest;
 use FOS\RestBundle\Controller\AbstractFOSRestController;
-use JMS\Serializer\SerializerInterface;
+use JMS\Serializer\SerializationContext as Context;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 
@@ -50,7 +52,7 @@ class MachineOutilController extends AbstractFOSRestController
     }
 
     /**
-     * liste toutes nos machines
+     * liste toutes les machines présentent dans la base de données
      *
      * @Rest\Get(
      *     path = "/machines",
@@ -62,14 +64,38 @@ class MachineOutilController extends AbstractFOSRestController
     public function getAllMachines(MachineOutilRepository $machineRep): JsonResponse
     {
         return new JsonResponse(
-            $this->serialize($machineRep->findAll(), SerializerInterface::create()->setGroups(array('list'))),
+            $this->serialize($machineRep->findAll(), Context::create()->setGroups(array('list'))),
+            Response::HTTP_OK,
+            [],
+            true);
+    }
+
+    /**
+     * liste toutes les machines de l'utilisateur connecté
+     *
+     * @Rest\Get(
+     *     path = "/all_user_machines",
+     *     name = "user_list_machines_collections_get"
+     * )
+     * @param MachineOutilRepository $machineRep
+     * @param UserRepository $userRepository
+     * @return JsonResponse
+     * @throws NonUniqueResultException
+     */
+    public function getAllUserMachines(MachineOutilRepository $machineRep, UserRepository $userRepository): JsonResponse
+    {
+        $user = $userRepository->loadUserByUsername($this->getUser()->getUsername());
+        $all_user_machines = $machineRep->findBy(['user' => $user->getSalt()]);
+
+        return new JsonResponse(
+            $this->serialize($all_user_machines, Context::create()->setGroups(array('list'))),
             Response::HTTP_OK,
             [],
         true);
     }
 
     /**
-     * méthode récupérant une machine
+     * méthode récupérant la machine d'identifiant id
      * @Rest\Get(
      *     path = "machines/{id}",
      *     name = "item_machine_get",
@@ -81,7 +107,7 @@ class MachineOutilController extends AbstractFOSRestController
     public function getMachineItem(MachineOutil $machineOutil): JsonResponse
     {
         return new JsonResponse(
-            $this->serialize($machineOutil, SerializerInterface::create()->setGroups(array('list','detail'))),
+            $this->serialize($machineOutil, Context::create()->setGroups(array('list','detail'))),
             Response::HTTP_OK,
             [],
             true
@@ -89,18 +115,23 @@ class MachineOutilController extends AbstractFOSRestController
     }
 
     /**
+     * création d'une machine
+     *
      * @Rest\Post(
-     *     path = "/machines",
+     *     path = "/create_machine",
      *     name = "item_machine_create"
      *)
      * @param MachineOutil $machineOutil
+     * @param UserRepository $userRepository
      * @param EntityManagerInterface $entityManager
      * @param UrlGeneratorInterface $urlGenerator
      * @param ValidatorInterface $validator
      * @return JsonResponse
+     * @throws NonUniqueResultException
      */
     public function createMachine(
         MachineOutil $machineOutil,
+        UserRepository $userRepository,
         EntityManagerInterface $entityManager,
         UrlGeneratorInterface $urlGenerator,
         ValidatorInterface $validator
@@ -116,12 +147,12 @@ class MachineOutilController extends AbstractFOSRestController
                 true
             );
         }
-        $machineOutil->setUser($entityManager->getRepository(User::class)->findOneBy([]));
+        $machineOutil->setUser($userRepository->loadUserByUsername($this->getUser()->getUsername()));
         $entityManager->persist($machineOutil);
         $entityManager->flush();
 
         return new JsonResponse(
-            $this->serialize($machineOutil, SerializerInterface::create()->setGroups(array('list','detail'))),
+            $this->serialize($machineOutil, Context::create()->setGroups(array('list','detail'))),
             Response::HTTP_CREATED,
             ["Location" => $urlGenerator->generate(
                 "item_machine_get",
@@ -132,8 +163,9 @@ class MachineOutilController extends AbstractFOSRestController
     }
 
     /**
+     * mise à jour de toutes les données de la machine
      * @Rest\Put(
-     *     path = "machines/{id}",
+     *     path = "update_data_machine/{id}",
      *     name = "item_machine_update",
      *     requirements = {"id"="\d+"}
      * )
@@ -148,6 +180,13 @@ class MachineOutilController extends AbstractFOSRestController
         ValidatorInterface $validator
     ): JsonResponse
     {
+        if($machineOutil->getUser() !== $this->getUser()){
+            $failure_message = [
+                "code" => 403,
+                "message" => 'You are not authorized to modify this machine because it is not your'
+            ];
+            return new JsonResponse($failure_message, Response::HTTP_FORBIDDEN);
+        }
         $errors = $validator->validate($machineOutil);
 
         if($errors->count() > 0){
@@ -161,12 +200,17 @@ class MachineOutilController extends AbstractFOSRestController
 
         $entityManager->flush();
 
-        return new JsonResponse(null, Response::HTTP_NO_CONTENT);
+        $success_msg = [
+            "code" => 200,
+            "message" => "The update was completed successfully"
+        ];
+        return new JsonResponse($success_msg, Response::HTTP_OK);
     }
 
     /**
+     * suppression de la machine d'identifiant id
      * @Rest\Delete(
-     *     path = "/machines/{id}",
+     *     path = "/delete_machine/{id}",
      *     name = "item_machine_delete",
      *     requirements = {"id" = "\d+"}
      * )
@@ -176,10 +220,21 @@ class MachineOutilController extends AbstractFOSRestController
      */
     public function deleteMachine(MachineOutil $machineOutil, EntityManagerInterface $entityManager): JsonResponse
     {
+        if($machineOutil->getUser() !== $this->getUser()){
+            $failure_message = [
+                "code" => 403,
+                "message" => 'You are not authorized to delete this machine because it is not your'
+            ];
+            return new JsonResponse($failure_message, Response::HTTP_FORBIDDEN);
+        }
         $entityManager->remove($machineOutil);
         $entityManager->flush();
 
-        return new JsonResponse(null, Response::HTTP_NO_CONTENT);
+        $success_message = [
+            "code" => 200,
+            "message" => 'The machine was successfully deleted'
+        ];
+        return new JsonResponse($success_message, Response::HTTP_OK);
     }
 
     /**
